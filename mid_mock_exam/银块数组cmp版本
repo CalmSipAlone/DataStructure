@@ -1,0 +1,99 @@
+/**
+ * 银块管理 —— 数组 + qsort 版本
+ *
+ * 操作规则：
+ *  正数 → 购入，插入后保持升序（qsort）
+ *  负数 → 卖出 |m| 克，从最小银块开始依次取，最后一个可能切割
+ *  零   → 熔合所有 < 10g 的银块为一块
+ *  999999 → 结束
+ */
+
+#include <stdio.h>
+#include <string.h>
+
+#define MAX_BLOCKS 10000
+
+/** 有序插入：在升序数组 arr[0..count-1] 中插入 x，保持升序 */
+void insert_sorted(int arr[], int *count, int x) {
+    int pos = *count;
+    while (pos > 0 && arr[pos - 1] > x) {
+        arr[pos] = arr[pos - 1];
+        pos--;
+    }
+    arr[pos] = x;
+    (*count)++;
+}
+
+int main() {
+    int arr[MAX_BLOCKS];
+    int count = 0;
+    int x;
+
+    while (scanf("%d", &x) == 1 && x != 999999) {
+        if (x > 0) {
+            insert_sorted(arr, &count, x);
+
+        } else if (x < 0) {
+            /* ─── 卖出 ─── */
+            int m = -x;  // 要卖出的克数
+
+            // 先算总重量，不够则忽略
+            int total = 0;
+            for (int i = 0; i < count; i++) total += arr[i];
+            if (total < m) continue;
+
+            // 从最小的银块开始取
+            int accum = 0;
+            int remove_cnt = 0;    // 完整取走的银块个数
+
+            while (remove_cnt < count && accum + arr[remove_cnt] < m) {
+                accum += arr[remove_cnt];
+                remove_cnt++;
+            }
+
+            // arr[remove_cnt] 是可能要被切割的银块
+            if (accum + arr[remove_cnt] > m) {
+                // 需要切割：剩下 (accum + arr[remove_cnt] - m) 克
+                int remainder = accum + arr[remove_cnt] - m;
+                arr[remove_cnt] = remainder;
+                // 把前 remove_cnt 个银块移除
+                memmove(arr, arr + remove_cnt, (count - remove_cnt) * sizeof(int));
+                count -= remove_cnt;
+            } else {
+                // 刚好取完，不需要切割
+                memmove(arr, arr + remove_cnt + 1, (count - remove_cnt - 1) * sizeof(int));
+                count -= remove_cnt + 1;
+            }
+            // ⚠ 注意：这里没有重新 qsort，因为切割后的剩余重量 ≤ 原重量，
+            // 在升序数组中仍然排在正确位置（或更前），无需重排
+
+        } else if (x == 0) {
+            /* ─── 熔合 ─── */
+            int sum_small = 0;
+            int new_cnt = 0;
+
+            // 遍历：小于 10 的累加并丢弃，大于等于 10 的保留
+            for (int i = 0; i < count; i++) {
+                if (arr[i] < 10) {
+                    sum_small += arr[i];
+                } else {
+                    arr[new_cnt++] = arr[i];
+                }
+            }
+            count = new_cnt;
+
+            if (sum_small > 0) {
+                insert_sorted(arr, &count, sum_small);
+            }
+        }
+    }
+
+    /* ─── 输出结果 ─── */
+    for (int i = 0; i < count; i++) {
+        if (i > 0) printf(" ");
+        printf("%d", arr[i]);
+    }
+    printf("\n");
+
+    return 0;
+}

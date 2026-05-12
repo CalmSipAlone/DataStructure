@@ -1,0 +1,137 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+typedef struct Node {
+    char ch;
+    struct Node *link;
+} Node;
+
+// 密钥去重
+void desame_key( char *key, char *dedup_key) {
+    int idx = 0;
+    for (int i = 0; key[i] != '\0'; i++) {
+        unsigned char c = (unsigned char)key[i];
+        int repeat = 0;
+        for (int j = 0; j < idx; j++) {
+            if ((unsigned char)dedup_key[j] == c) {
+                repeat = 1;
+                break;
+            }
+        }
+        if (!repeat) {
+            dedup_key[idx++] = c;
+        }
+    }
+    dedup_key[idx] = '\0';
+}
+
+// 生成字符串
+void generate_ring_str( char *dedup_key, char *ring_str) {
+    int idx = 0;
+    for (int i = 0; dedup_key[i] != '\0'; i++) {
+        ring_str[idx++] = dedup_key[i];
+    }
+    for (int c = 32; c <= 126; c++) {
+        int exist = 0;
+        for (int j = 0; j < idx; j++) {
+            if ((unsigned char)ring_str[j] == c) {
+                exist = 1;
+                break;
+            }
+        }
+        if (!exist) {
+            ring_str[idx++] = c;
+        }
+    }
+    ring_str[idx] = '\0';
+}
+
+// 创建循环链表
+Node* create_node( char *ring_str) {
+    if (ring_str[0] == '\0') return NULL;
+    Node *head = (Node*)malloc(sizeof(Node));
+    head->ch = ring_str[0];
+    Node *tail = head;
+    for (int i = 1; ring_str[i] != '\0'; i++) {
+        Node *new_node = (Node*)malloc(sizeof(Node));
+        new_node->ch = ring_str[i];
+        tail->link = new_node;
+        tail = new_node;
+    }
+    tail->link = head;
+    return head;
+}
+
+// 生成字符加密表
+void key(Node *head, char start_char, char map[128]) {
+    if (head == NULL) return;
+    Node *prev = head;
+    while (prev->link != head) {
+        prev = prev->link;
+    }
+    Node *curr = head;
+    int total = 95; 
+
+    while (total > 1) {
+        char plain = curr->ch;
+        prev->link = curr->link;
+        free(curr);
+        total--;
+        curr = prev->link;
+
+        int step = (int)((unsigned char)plain);
+        for (int i = 0; i < step; i++) {
+            curr = curr->link;
+        }
+        char cipher = curr->ch;
+        map[(unsigned char)plain] = cipher;
+
+        Node *del = curr;
+        Node *p = prev;
+        while (p->link != del) {
+            p = p->link;
+        }
+        p->link = del->link;
+        free(del);
+        total--;
+
+        curr = p->link;
+        prev = p;
+    }
+    map[(unsigned char)curr->ch] = start_char;
+}
+
+int main() {
+    char raw_key[33] = {0};
+    fgets(raw_key, 33, stdin);
+    size_t len = strlen(raw_key);
+    if (len > 0 && raw_key[len-1] == '\n') {
+        raw_key[len-1] = '\0';
+    }
+    char dedup_key[96] = {0};
+    desame_key(raw_key, dedup_key);
+    char start = dedup_key[0];
+    char ring_str[96] = {0};
+    generate_ring_str(dedup_key, ring_str);
+    Node *head = create_node(ring_str);
+    char cipher_map[128] = {0};
+    key(head, start, cipher_map);
+    FILE *fin = fopen("in.txt", "r");
+    FILE *fout = fopen("in_crpyt.txt", "w");
+    if (!fin || !fout) {
+        printf("文件打开失败\n");
+        return 1;
+    }
+    int ch;
+    while ((ch = fgetc(fin)) != EOF) {
+        if (ch >= 32 && ch <= 126) {
+            fputc(cipher_map[(unsigned char)ch], fout);
+        } else {
+            fputc(ch, fout);
+        }
+    }
+    fclose(fin);
+    fclose(fout);
+    return 0;
+}
